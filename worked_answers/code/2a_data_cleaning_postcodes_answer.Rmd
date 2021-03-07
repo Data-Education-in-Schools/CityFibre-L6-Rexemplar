@@ -1,0 +1,195 @@
+---
+title: "CityFibre - 2a. Data Cleaning - postcode file"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 2a - Postcode dataset cleaning**
+
+This notebook steps through the second step of the CityFibre data analysis problem: cleaning the postcode dataset. The output cleaned dataset is then used for postcode validation and mapping between postcodes and datazones.
+
+This involves: 
+
+* Subsetting the postcode datasets to the columns of interest
+* Joining the small and large datasets together
+* Investigating the reason behind duplicates and removing them
+* Adding descriptions to the Urban Rural classification
+
+</div>
+
+# Postcode file preparation
+
+## Select the required columns
+
+The postcode datasets both contain over 50 columns, not all of these are required for the further analysis.
+
+<div class="alert alter-block alert-info">
+
+The required columns in the postcode files are:
+
++ postcode
++ postcode_district
++ postcode_sector
++ date_of_introduction
++ date_of_deletion
++ grid_reference_easting
++ grid_reference_northing
++ latitude
++ longitude
++ split_indicator
++ data_zone2011code
++ urban_rural8fold2016code
+
+
+This gives the geographical information, the current validity of the postcode, the link to the datazone and the urban_rural code which highlights the type of location the postcode is in.
+
+The urban_rural information has been requested to be used by CityFibre, as they wish to focus on the more rural postcodes with existing poor connections.
+
+</div>
+
+Using `select()` subset the small and large postcode files to the set of required columns.
+In addition, using `mutate()` create an additional field to identify the postcode type.
+```{r}
+pc_small_subset <- pc_small_input %>%
+  select(postcode, postcode_district, postcode_sector, date_of_introduction, date_of_deletion,
+         grid_reference_easting, grid_reference_northing, latitude, longitude, split_indicator, 
+         data_zone2011code, urban_rural8fold2016code) %>%
+  mutate(pc_type = "small")
+
+pc_large_subset <- pc_large_input %>%
+  select(postcode, postcode_district, postcode_sector, date_of_introduction, date_of_deletion,
+         grid_reference_easting, grid_reference_northing, latitude, longitude, split_indicator, 
+         data_zone2011code, urban_rural8fold2016code) %>%
+  mutate(pc_type = "large")
+```
+
+## Join small and large user datasets together
+
+<div class="alert alter-block alert-info">
+
+The small and large datasets contain the same columns, so the required join is an **append**, whereby one dataset is added to the bottom of the other.
+
+The `bind_rows()` function is used in R to append datasets.
+
+</div>
+
+Use the `bind_rows()` function to append the `pc_large_subset` dataset onto the bottom of the `pc_small_subset`
+```{r}
+pc_combined <- bind_rows(pc_small_subset, pc_large_subset)
+```
+
+Use `arrange()` to sort alphabetically by `postcode`
+```{r}
+pc_combined <- arrange(pc_combined, postcode)
+```
+
+## Investigate and remove duplicates
+
+It was identified in **1_data_understanding** that the postcodes were not all unique. This requires further investigation.
+
+<div class="alert alter-block alert-info">
+
+The investigation starts by identifying the duplicate postcodes.
+
+A detailed look at an example duplicate should be able to highlight the issue.
+
+The function `count()` counts the unique values of a variable
+
+</div>
+
+Use the `count()` function to group the combined postcode file by postcode.
+```{r}
+pc_check <- count(pc_combined, postcode)
+```
+
+Arrange this output check by the descending value of count.
+Use `arrange(dataset, desc(varname))` to reorder the output check with the most duplicated postcodes at the top.
+Use `head()` to print out the top 10 rows.
+```{r}
+pc_check <- arrange(pc_check, desc(n))
+
+head(pc_check)
+```
+This shows that `KA11 5AR` is recorded 6 times. Use this example duplicate to investigate the issue.
+
+Use `filter()` to select only the rows where the postcode equals "KA11 5AR"
+```{r}
+ka11 <- filter(pc_combined, postcode == "KA11 5AR")
+
+print(ka11)
+```
+From this it can be seen that this postcode has been in and out of use since 1980.
+The postcode file contains the full history of postcode changes.
+
+Valid postcodes for this analysis are those that have not got a `date_of_deletion` and are therefore still live.
+
+## Retain only live postcodes
+
+Use `filter()` and `is.na()` to create a postcode file containing only live postcodes with a missing `date_of_deletion`
+```{r}
+pc_live <- filter(pc_combined, is.na(date_of_deletion))
+```
+There are 158504 live postcodes retained from the original 240346 combined postcodes
+
+Finally check there are no duplicates
+```{r}
+n_distinct(pc_live$postcode)
+```
+There are 158504 unique postcodes, so no duplicates.
+
+# Urban Rural classification reference data
+
+<div class="alert alter-block alert-info">
+
+The urban rural 8-fold classification code is a number between 1 and 8. However that does not provide information on what the code means.
+
+It is necessary to create a reference (lookup) dataset that maps the code to its name.
+
+The definitions for urban rural 8-fold classification can be found [here](https://www.gov.scot/publications/scottish-government-urban-rural-classification-2016/pages/2/)
+
+</div>
+
+Create a vector containing the codes 1 to 8 called `urban_rural8fold2016code`
+```{r}
+urban_rural8fold2016code <- c(1:8)
+```
+
+Create a vector containing the names of the codes called `urban_rural8fold2016name`
+```{r}
+urban_rural8fold2016name <- c("Large Urban Areas",
+               "Other Urban Areas",
+               "Accessible Small Towns",
+               "Remote Small Towns",
+               "Very Remote Small Towns",
+               "Accessible Rural Areas",
+               "Remote Rural Areas",
+               "Very Remote Rural Areas")
+```
+
+Join the two vectors together in a data frame
+```{r}
+ur_ref <- data.frame(urban_rural8fold2016code, urban_rural8fold2016name)
+```
+
+Print out this reference dataset to make sure the codes match up correctly with the names
+```{r}
+print(ur_ref)
+```
+
+Merge this reference dataset into the postcode data file, joining on the code
+Use a `left_join()` and use the `urban_rural8fold2016code` as the join key.
+```{r}
+pc_live <- left_join(pc_live, ur_ref, by = "urban_rural8fold2016code")
+```
+
+

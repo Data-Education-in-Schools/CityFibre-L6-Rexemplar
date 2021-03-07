@@ -1,0 +1,344 @@
+---
+title: "CityFibre - 2c. Data validity and cleaning - CityFibre file"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 2c - CityFibre data validity**
+
+This notebook steps through the fourth step of the CityFibre data analysis problem: validating the CityFibre provided dataset. 
+
+Some initial problems have already been hinted at that require further investigation:
+
+* Duplicate postcodes
+* Some Glasgow postcodes have been identified in Renfrewshire and vice versa
+* Retaining only "live" postcodes
+
+Additional issues may also be identified as the dataset is validated
+
+</div>
+
+# CityFibre file validity
+
+## Duplicate rows
+
+<div class="alert alter-block alert-info">
+
+The `distinct()` function from `dplyr` will only **deduplicate** exact rows.
+
+</div>
+
+Apply `distinct()` to the `cf_input` dataset and rename the output as `cf_dedupe`
+```{r}
+cf_dedupe <- distinct(cf_input)
+```
+The `_input` dataset had 66438 rows, but this deduplicated one has only 51714.
+A large number of exactly duplicate rows have been removed.
+
+## Duplicate postcodes
+
+Use `n_distinct` to check for the remaining number of unique postcodes.
+```{r}
+n_distinct(cf_dedupe$postcode)
+```
+There are only 50571 unique postcodes in this file, but 51714 rows.
+
+This implies there are still some duplicate postcodes that require investigation.
+
+Use `add_count()` to add a count of postcodes onto the existing dataset, `filter()` to retain only the duplicate rows and use `arrange()` to sort the resulting dataset by the postcode
+```{r}
+cf_dupes <- cf_dedupe %>%
+  add_count(postcode) %>%
+  filter(n > 1) %>%
+  arrange(postcode)
+```
+
+`print()` the resulting dataset
+```{r}
+print(cf_dupes)
+```
+Through manual inspection of this dataset it can be seen that there are two independent issues:
+
++ Issue 1 - postcodes on the border of Glasgow and Renfrewshire have been assigned to both Glasgow and Renfrewshire
++ Issue 2 - a single postcode crosses multiple CityFibre nodes.
+
+
+### Issue 1 - Glasgow/Refrewhshire postcodes
+
+<div class="alert alter-block alert-info">
+
+Renfrewshire postcodes should start with PA and Glasgow postcodes should start with G
+Delete any that don't follow this pattern in the `cf_dedupe` dataset
+
+Create a boolean field that confirms whether area code matches the city
+Then filter out those that fail the check.
+
+The easiest way to create the check is to merge in a reference dataset with the correct city related to the pc_area and then compare cities.
+
+</div>
+
+Create a vector of all possible values of `pc_area`
+```{r}
+pc_area <- c("AB", "DD", "EH", "G", "IV", "PA", "FK")
+```
+
+Create a vector with the correct city for that postcode
+```{r}
+pc_city <- c("Aberdeen", "Dundee", "Edinburgh", "Glasgow", "Inverness", "Renfrewshire", "Stirling")
+```
+
+Create a reference dataset containing both vectors
+`print()` it out
+```{r}
+pc_ref <- data.frame(pc_area, pc_city)
+
+print(pc_ref)
+```
+Merge into the `cf_dedupe` dataset using a `left_join()` keyed on `pc_area`
+```{r}
+cf_check <- left_join(cf_dedupe, pc_ref, by = "pc_area")
+```
+
+Using `mutate()` create a check field that tests whether the `city == pc_city`
+```{r}
+cf_check <- mutate(cf_check, pc_check = city == pc_city)
+```
+
+Using `filter()` review the rows that fail the check
+```{r}
+cf_fail <- filter(cf_check, !pc_check)
+
+print(cf_fail)
+```
+These are all Glasgow and Refrewshire issues.
+
+`filter()` these out, calling the resulting dataset `cf_dedupe2`
+```{r}
+cf_dedupe2 <- filter(cf_check, pc_check)
+```
+
+### Issue 2 - Multiple CityFibre nodes
+
+<div class="alert alter-block alert-info">
+
+The final issue is related to the level of the file.
+
+The CF input dataset is not actually at postcode level, it is at postcode and node level.
+Need to reduce this dataset to postcode level by removing the node field and deduping
+
+</div>
+
+Create a new postcode level file.
+
+Deselect the `node` field.
+
+Only keep `distinct()` rows
+```{r}
+cf_pc_level <- cf_dedupe2 %>%
+  select(-node) %>%
+  distinct()
+```
+
+Do a final check to ensure all the remaining postcodes are unique
+```{r}
+n_distinct(cf_pc_level$postcode)
+```
+The file is of size 49984, so all postcodes are unique.
+
+## Retain only "live" postcodes
+
+<div class="alert alter-block alert-info">
+
+Now that the postcode file has been prepared it is possible to check the validity of the postcodes in the CityFibre-provided dataset.
+
+An `anti_join()` will return the set of non_matching items. 
+
+By doing an `anti_join()` between the postcode level file and the full set of live postcodes it will be possible to see which ones don't match a live postcode
+
+</div>
+
+Create a 'non_match' dataset using an anti_join() keyed on "postcode"
+```{r}
+non_match <- anti_join(cf_pc_level, pc_live, by = "postcode")
+```
+This has identified 14158 non-matching postcodes
+
+Use `print()` to review the set of non_matching postcodes
+```{r}
+print(non_match)
+```
+Visual inspection of this file has highlighted an additional issue, some of the postcodes in the CityFibre input dataset have been formatted without a space in the middle, which means they won't join correctly to a set of properly formatted postcodes.
+
+## Postcode format
+
+<div class="alert alter-block alert-info">
+
+All the postcodes need to be consistently formatted.
+
+The most reliable consistent postcode format is for all spaces to be removed and is all in uppercase.
+This new "postcode" field will need to be created in all the supporting files to support joining between all the different working datasets.
+
+</div>
+
+Create an additional `postcode2` field that has had all the spaces removed and in uppercase in the `cf_pc_level` dataset.
+Use `str_to_upper()` for uppercase and `str_remove_all(varname, " ")` to remove spaces
+```{r}
+cf_pc_level <- mutate(cf_pc_level, postcode2 = str_remove_all(str_to_upper(postcode), " "))
+```
+
+Use `head()` to review the output dataset
+```{r}
+head(cf_pc_level)
+```
+Create additional `postcode2` fields in the `pc_live` and `sbvs_input` datasets.
+```{r}
+pc_live <- mutate(pc_live, postcode2 = str_remove_all(str_to_upper(postcode), " ")) 
+
+sbvs_input <- mutate(sbvs_input, postcode2 = str_remove_all(str_to_upper(postcode), " ")) 
+```
+
+## Redo validity check
+
+Redo the `anti_join()` check but this time merging on `postcode2`
+```{r}
+non_match2 <- anti_join(cf_pc_level, pc_live, by = "postcode2")
+```
+This time only 181 postcodes are not valid.
+
+<div class="alert alter-block alert-info">
+
+These 181 actual non-valid postcodes need to be removed from the CityFibre dataset as they are no longer valid live postcodes.
+
+To do this a `semi_join()` can be used. This is the opposite of the `anti_join()`, it only takes the rows from the left table that are present in the right table.
+
+</div>
+
+Use a `semi_join()` to create a table of valid CityFibre postcodes
+```{r}
+cf_pc_valid <- semi_join(cf_pc_level, pc_live, by = "postcode2")
+```
+This outputs 49803 rows, which is 181 less than the original 49984.
+
+This gives a clean set of starting postcodes for the CityFibre dataset - `cf_pc_valid`.
+
+# Creating postcode level analysis file
+
+## Add scheme_references
+Need to merge in the scheme_references.
+
+Start by creating the input table for merging.
+Create a `sbvs_merge` dataset containing `postcode2` and `scheme_reference` columns.
+```{r}
+sbvs_merge <- select(sbvs_input, -postcode)
+```
+
+Using a 'left_join()` and `postcode2` as the key, merge in the `scheme_references`
+```{r}
+cf_pc_valid2 <- left_join(cf_pc_valid, sbvs_merge, by = "postcode2")
+```
+
+## Add in the required postcode information
+
+Start by creating the input table for merging.
+
+Use `names()` to view the columns in `pc_live`
+```{r}
+names(pc_live)
+```
+
+<div class="alert alter-block alert-info">
+
+The required fields for merging are:
+
+* grid_reference_easting 
+* grid_reference_northing 
+* latitude 
+* longitude
+* pc_type
+* postcode2
+
+In addition the following fields are required and should be renamed
+* data_zone2011code - data_zone
+* urban_rural8fold2016code - ur_class
+* urban_rural8fold2016name - ur_name
+
+</div>
+
+Using `select()` and `rename()` create a `pc_merge` dataset containing the above fields
+```{r}
+pc_merge <- pc_live %>%
+  select(grid_reference_easting, 
+         grid_reference_northing, 
+         latitude, 
+         longitude, 
+         split_indicator, 
+         data_zone2011code,
+         urban_rural8fold2016code,
+         urban_rural8fold2016name,
+         pc_type,
+         postcode2) %>%
+  rename(data_zone = data_zone2011code,
+         ur_class = urban_rural8fold2016code,
+         ur_name = urban_rural8fold2016name)
+```
+
+Using a `left_join()` merge this into the latest CityFibre dataset using `postcode2` as the key
+```{r}
+cf_pc_valid3 <- left_join(cf_pc_valid2, pc_merge, by = "postcode2")
+```
+
+## Add in the SIMD data at postcode level
+
+Create an input table for merging from `simd_clean` which contans only the ranks, rates, metrics and the data_zone for merging on
+```{r}
+simd_merge <- (select(simd_clean, data_zone, income_support_rate, employment_support_rate, nobroadband_rate, simd5, simd10, simd_rank))
+```
+
+Using a `left_join()` joining on the `data_zone` to create the final postcode level analysis dataset
+```{r}
+cf_pc_analysis <- left_join(cf_pc_valid3, simd_merge, by = "data_zone")
+```
+
+Using `head()` review the final postcode-level analysis dataset
+```{r}
+head(cf_pc_analysis)
+```
+
+
+# Create datazone level analysis file
+
+<div class="alert alter-block alert-info">
+
+For the SIMD data, which is keyed on data_zone, the datazones of interest are those linked to the live CityFibre postcodes. This is a subset of all the possible datazones.
+
+</div>
+
+Using `select()` and `distinct()` create a dataset just containing the CityFibre datazones.
+```{r}
+cf_datazones <- select(cf_pc_valid3, data_zone) %>%
+  distinct()
+```
+This leaves 2395 datazones of interest
+
+## Merge in the cleaned SIMD data
+
+Using a `left_join()` merge in the `simd_clean` dataset by `data_zone`.
+Name this the analysis dataset.
+```{r}
+cf_dz_analysis <- left_join(cf_datazones, simd_clean, by = "data_zone")
+```
+
+Using `head()` review the final datazone-level analysis dataset
+```{r}
+head(cf_dz_analysis)
+```

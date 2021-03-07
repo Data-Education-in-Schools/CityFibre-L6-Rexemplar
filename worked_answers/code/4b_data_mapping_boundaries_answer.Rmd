@@ -1,0 +1,277 @@
+---
+title: "CityFibre - 4b. Data Mapping - postcode boundaries"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 4b - CityFibre priority postcode mapping**
+
+This notebook steps through the seventh step of the CityFibre data analysis problem: mapping the priority postcodes
+
+The purpose of this exercise is to be able to easily share the location and information about the priority postcodes and also to visually see where they are located.
+
+Are they all in one city?
+
+Are in the centres, or on the edges of the cities?
+
+The mapping activity will involve use of additional packages and an open source mapping tool called [Leaflet](https://leafletjs.com/)
+
+The steps involved with mapping the postcodes onto a map include:
+
+* Read in the postcode boundaries
+* Convert coordinates to longitude and latitude
+* Merge in any additional data
+* Create pop-up labels for each postcode
+* Convert to a spatial file type
+* Import this information to the map
+* Save the map as an html file for sharing
+
+</div>
+
+# Set up the mapping environment
+
+<div class="alert alert-block alert-info">
+
+Additional packages are required to support the mapping activities.
+
+Ensure they are installed and loaded.
+
+</div>
+
+```{r}
+if (!require(leaflet)){
+  install.packages("leaflet")
+  library(leaflet)
+}
+
+if (!require(htmlwidgets)){
+  install.packages("htmlwidgets")
+  library(htmlwidgets)
+}
+```
+
+# Import postcode boundary files
+
+<div class="alert alert-block alert-info">
+
+The geometry information for the postcodes is available in the postcode shape files.
+
+</div>
+
+Using `st_read()`, read in the postcode boundary shape file - "PC_CUT_20_2.shp" tidying up the column names on import
+```{r}
+pc_geom_input <- st_read(file.path(input_file_path, "PC_CUT_20_2/PC_CUT_20_2.shp")) %>%
+  clean_names()
+```
+Using `head()` have quick look at this data
+```{r}
+head(pc_geom_input)
+```
+It can be seen that each row is a postcode and the boundaries are contained within the geometry information. The geometry information is a set of polygons defined by points.
+
+Subset the file to just retain only the postcode and geometry fields.
+```{r}
+pc_boundaries <- select(pc_geom_input, postcode, geometry)
+```
+
+# Convert coordinate system
+
+<div class="alert alert-block alert-info">
+
+This is similar to a dataframe, but contains geometric information in a specific coordinate system.
+This file contains polygons defining the boundaries of each postcode.
+
+The coordinate system currently used is the OSGB 1936 /British National Grid, which maps the boundaries to Eastings and Northings.  
+[Ordinance Survey National Grid](https://en.wikipedia.org/wiki/Ordnance_Survey_National_Grid)
+
+To use a mapping tool, these need to be converted to values of longitude and latitude.
+This can be done using a coordinate system transformation.
+The value required is 4326, which links to the [World Geodetic System](https://en.wikipedia.org/wiki/World_Geodetic_System)
+
+</div>
+
+Transform the geometry to longitude and latitude using `st_transform()` and setting the coordinate reference system `crs` to 4326
+```{r}
+pc_latlong <- st_transform(pc_boundaries, crs = 4326)
+```
+
+# Merge in additional data
+
+Finally recreate the `postcode2` field to enable merging in of additional data items.
+Use `str_to_upper()` for uppercase and `str_remove_all(varname, " ")` to remove spaces
+```{r}
+pc_latlong <- mutate(pc_latlong, postcode2 = str_remove_all(str_to_upper(postcode), " "))
+```
+
+Keep only the priority postcode geometry by doing a `left_join()` with the cf_pc_focus file
+
+Geometry is only available for "small" postcodes, so also filter out those that do not have any geometry
+```{r}
+cf_focus_latlong <- cf_pc_focus %>%
+  select(postcode2, scheme_references, ur_class, simd10, simd_rank, nobroadband_rate) %>%
+  left_join(pc_latlong, by = "postcode2") %>%
+  filter(!is.na(geometry))
+```
+
+# Create pop-up labels
+
+Create a popup labels for each postcode on the map for both scoring approaches
+```{r}
+cf_focus_latlong <- cf_focus_latlong %>%
+  mutate(pop_label = paste(sep = "<br/>",
+                           paste0("<b>",postcode,"</b>"),
+                           paste0("Scheme: ", scheme_references), 
+                           paste0("Urban Rural Classification: ", ur_class), 
+                           paste0("SIMD Decile: ", simd10),
+                           paste0("SIMD Rank: ", simd_rank),
+                           paste0("No broadband access rate: ", nobroadband_rate, "%")))
+```
+
+# Convert to a spatial file type
+
+The file will need to be converted to a spatial file type for mapping
+```{r}
+cf_focus_latlong_sf <- st_as_sf(cf_focus_latlong)
+```
+
+Create coordinates for the centre of the map to be around the centre of Scotland
+```{r}
+centre_long <- -4.2
+centre_lat <- 56.5
+```
+
+# Import into a leaflet map
+
+Draw the boundaries using the leaflet package
+```{r}
+
+map <- leaflet(cf_focus_latlong_sf) %>%
+  setView(lng = centre_long, lat = centre_lat, zoom = 7) %>%
+  addTiles() %>%
+  addPolygons(weight = 2, 
+             color = "#ff8c00", 
+             stroke = TRUE, 
+             fillOpacity = 0.5,
+             highlight = highlightOptions(color = "#000000",
+                                          weight = 2,
+                                          stroke = TRUE,
+                                          fillOpacity = 0.8,
+                                          bringToFront = TRUE),
+             popup = ~pop_label
+             )
+
+map  
+```
+
+Define the directory where the output file should be saved by defining the `output_file_path`
+```{r}
+output_file_path <- "/Users/jowatts/github/cityfibre-schools/outputs"
+```
+
+Save this map to the output directory so it can be shared with others
+```{r}
+saveWidget(map, file = file.path(output_file_path, "cf_prioritypc.html"))
+```
+
+# Compare with the second scoring approach
+
+Merge in data to 
+```{r}
+cf_focus_latlong2 <- cf_pc_focus2 %>%
+  select(postcode2, scheme_references, ur_class, simd10, simd_rank, nobroadband_rate) %>%
+  left_join(pc_latlong, by = "postcode2") %>%
+  filter(!is.na(geometry))
+```
+
+Add in the pop-up labels
+```{r}
+cf_focus_latlong2 <- cf_focus_latlong2 %>%
+  mutate(pop_label = paste(sep = "<br/>",
+                           paste0("<b>",postcode,"</b>"),
+                           paste0("Scheme: ", scheme_references), 
+                           paste0("Urban Rural Classification: ", ur_class), 
+                           paste0("SIMD Decile: ", simd10),
+                           paste0("SIMD Rank: ", simd_rank),
+                           paste0("No broadband access rate: ", nobroadband_rate, "%")))
+```
+
+Convert to a spatial file type
+```{r}
+cf_focus_latlong_sf2 <- st_as_sf(cf_focus_latlong2)
+```
+
+Draw the second map using different colours
+```{r}
+map2 <- leaflet(cf_focus_latlong_sf2) %>%
+  setView(lng = centre_long, lat = centre_lat, zoom = 7) %>%
+  addTiles() %>%
+  addPolygons(weight = 2, 
+             color = "#5e31ad", 
+             stroke = TRUE, 
+             fillOpacity = 0.5,
+             highlight = highlightOptions(color = "#000000",
+                                          weight = 2,
+                                          stroke = TRUE,
+                                          fillOpacity = 0.8,
+                                          bringToFront = TRUE),
+             popup = ~pop_label
+             )
+
+map2  
+```
+
+Write out the second map
+```{r}
+saveWidget(map2, file = file.path(output_file_path, "cf_prioritypc2.html"))
+```
+
+Add both maps together for comparison
+```{r}
+map3 <- leaflet() %>%
+  setView(lng = centre_long, lat = centre_lat, zoom = 7) %>%
+  addTiles() %>%
+  addPolygons(data = cf_focus_latlong_sf,
+              weight = 2, 
+             color = "#ff8c00", 
+             stroke = TRUE, 
+             fillOpacity = 0.5,
+             highlight = highlightOptions(color = "#000000",
+                                          weight = 2,
+                                          stroke = TRUE,
+                                          fillOpacity = 0.8,
+                                          bringToFront = TRUE),
+             popup = ~pop_label
+             ) %>%
+  addPolygons(data = cf_focus_latlong_sf2,
+              weight = 2, 
+             color = "#5e31ad", 
+             stroke = TRUE, 
+             fillOpacity = 0.5,
+             highlight = highlightOptions(color = "#000000",
+                                          weight = 2,
+                                          stroke = TRUE,
+                                          fillOpacity = 0.8,
+                                          bringToFront = TRUE),
+             popup = ~pop_label
+             )
+  
+map3
+```
+
+Write out the third map
+```{r}
+saveWidget(map3, file = file.path(output_file_path, "cf_prioritypc3.html"))
+```
+
+
+It can clearly be seen that the choice of scoring method has a very large impact on the prioritised postcodes.

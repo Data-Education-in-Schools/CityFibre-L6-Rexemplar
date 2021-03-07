@@ -1,0 +1,573 @@
+---
+title: "CityFibre - 1. Data Understanding"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 1 - Data Understanding**
+
+This notebook steps through the first part of the CityFibre data analysis problem.
+This involves: 
+
+* Setting up the computer environment with the required supporting packages
+* Reading in the datasets.
+* Tidying up the variable names in each dataset so that they are easier to work with.
+* Acquire an initial understanding of each dataset size and shape and the types and format of the data that they contain.
+* Identify any obvious data quality problems that might need to be addressed.
+* Finally, gain an insight into how the columns are related to each other.
+
+</div>
+
+# Set up the environment
+
+<div class="alert alter-block alert-info">
+
+R packages are a collection of functions developed by the open source community. They make it quicker to undertake analysis by providing additional functionality for common activities on top of base R's functionality.
+
+There are thousands of packages available to choose from on [CRAN](https://cran.r-project.org/) - The Comprehensive R Achive Network).
+
+Packages can be downloaded from CRAN using the command `install.packages("package-name").
+
+After the package has been installed, it needs to be loaded to make it available for each program using `library(package-name)`.
+
+</div>
+
+The packages required for Part 1 are:
+
+* tidyverse
+* janitor
+* sf
+
+## Install and load required packages
+
+Download these packages if they do not already exist locally and then load them.
+
+The `require()` function will check if they are installed and load them. If not the following code will download them from CRAN and then load them.
+```{r}
+
+if (!require(tidyverse)){
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+
+if (!require(janitor)){
+  install.packages("janitor")
+  library(janitor)
+}
+
+if (!require(sf)){
+  install.packages("sf")
+  library(sf)
+}
+```
+
+
+<div class="alert alter-block alert-info">
+
+The [tidyverse package](https://www.tidyverse.org/) is a collection of packages designed for data science.
+The [janitor package](https://garthtarr.github.io/meatR/janitor.html) is a set of functions for examining and cleaning data
+The [sf package](https://r-spatial.github.io/sf/) is designed to work with Simple Features which allow geographical and mapping data to be included in data frames.
+
+</div>
+
+## Set up the file path
+
+<div class="alert alter-block alert-info">
+
+All required input datasets are in a specific directory, called `data_lessons`.
+
+It is necessary to find this folder and set up a variable that points directly to this directory.
+All the input datasets can now be imported directly from this directory.
+
+</div>
+
+Assign the input_file_path to be the `data` directory
+```{r}
+input_file_path <- "/mypathtodata/data/"
+```
+
+# Read in CityFibre dataset
+
+<div class="alert alter-block alert-info">
+
+The initial dataset provided by CityFibre is called `cityfibre_scotland.csv`
+
+</div>
+
+Read the raw CityFibre data into a data frame using the read_csv() function from the `readr` tidyverse package. 
+Give the raw data frame a descriptive name e.g. `cf_raw`
+```{r}
+cf_raw <- read_csv(file.path(input_file_path, "cityfibre_scotland.csv"))
+```
+## Tidy up column names
+
+<div class="alert alter-block alert-info">
+
+Use the `clean_names` function from the `janitor` package to tidy up the columns names so that it is easier to work with.
+This will name the column names all lowercase and put an `_` between any multiple words
+
+</div>
+
+Apply the `clean_names()` function to the raw dataset.
+Give the output a new name (eg `cf_input`)  as it has how been altered from the raw input file.
+```{r}
+cf_input <- clean_names(cf_raw)
+```
+
+# Understanding the CityFibre dataset
+
+## Visual inspection
+
+The first thing to do when getting a dataset is to have a look at it.
+
+<div class="alert alter-block alert-info">
+
+The `head()` function shows the first few rows of a dataset.
+The `print()` function can also be used.
+
+</div>
+
+Use `head()` to look at the first 10 rows of the dataset.
+```{r}
+head(cf_input, 10)
+```
+Experiment with using the `print()` function instead.
+```{r}
+print(cf_input)
+```
+The difference is that the print function will show the whole dataset, whilst the head function just displays the requested number of rows.
+
+## Size, shape and format
+
+The next step is to understand the full size and shape of the dataset.
+
+<div class="alert alter-block alert-info">
+
+* The `str()` function shows the structure of the data frame.
+* The `glipmse()` function which is a transposed version of the `print()` function can also be used.
+* The `summary()` function is another method of displaying the contents of a data frame.
+
+</div>
+
+Use the `str()` function to display the dataset structure
+```{r}
+str(cf_input)
+```
+
+Use the `glimpse()` function instead
+```{r}
+glimpse(cf_input)
+```
+Use the `summary()` function instead
+```{r}
+summary(cf_input)
+```
+
+
+From all these different views it can be seen that the dataset has 66438 rows and 4 columns of string data
+
+* `city` is the name of the city that the data in each row belongs to
+* `city_code` is a 3-letter code for each city
+* `postcode` is the postcode for each line of data
+* `node` is CityFibre's identifier for each part of the city
+
+## Missing values
+
+The next step is to identify whether any of the columns contain missing values.
+
+<div class="alert alter-block alert-info">
+
+There are two types of missing values in R:
+
+* NA - Not Available. This is the more common method for representing missing data.
+* NaN - Not a Number. This is returned for numerical values that cannot be calculated.
+
+The generic function `is.na()` will return a boolean value for both type of missing.
+
+Using sum(is.na()) will enable the number of `TRUE` responses to be summed.
+
+</div>
+
+Calculate number of missing values in each column of the `cf_input` dataset
+```{r}
+sum(is.na(cf_input$city))
+sum(is.na(cf_input$city_code))
+sum(is.na(cf_input$postcode))
+sum(is.na(cf_input$node))
+```
+There are no missing values in any of the columns.
+
+## Unique values
+
+The next step is to identify the number of unique values present in each column.
+
+Use the `n_distinct()` function from the `dplyr` package to calculate the number of distinct values in each column of the `cf_input` dataset
+```{r}
+n_distinct(cf_input$city)
+n_distinct(cf_input$city_code)
+n_distinct(cf_input$postcode)
+n_distinct(cf_input$node)
+```
+There are 7 different values for `city` and `city_code`.
+
+2466 values for `node`. This is expected since a node covers an area of the city and multiple postcodes.
+
+50571 values for `postcode`. The dataset size is 66438, which hints at there being duplicate postcodes in the dataset. This will need to be investigated as this is expected to be a postcode level file, with one line for each valid postcode.
+
+## Column Relationships
+
+<div class="alert alter-block alert-warning">
+
+What are the 7 distinct values for `city` and `city_code`? And is there a mapping between them?
+
+</div>
+
+Use the `tabyl()` function from the `janitor` package to compare the `city` and `city_code` values.
+```{r}
+tabyl(cf_input, city, city_code)
+```
+This shows a 1-2-1 mapping between the `city_code` and the `city`, with `city_code` just being a 3-letter shortcut for each city.
+
+It also shows that the CityFibre dataset does not cover the whole of Scotland, only the 7 main cities.
+
+<div class="alert alter-block alert-warning">
+
+Is there a relationship between `city` and the `postcode` area?
+
+</div>
+
+<div class="alert alter-block alert-info">
+
+Postcode area is the first one or two letters of the postcode string before the first numeric digit. More information about postcodes can be found [here](https://en.wikipedia.org/wiki/Postcodes_in_the_United_Kingdom).
+
+This will need to be separated out from the postcode into an additional field.
+
+A Regular Expression pattern can be used to extract the area code. The pattern used here starts at the beginning of the string, and matches any capital letter 0 or 1 times. A useful tool to test patterns can be found here: https://regexr.com/ 
+
+`area_pattern <- "^[A-Z][A-Z]?"`
+
+</div>
+
+Use the area_pattern in a `mutate()` function to create a new `pc_area` field.
+```{r}
+area_pattern <- "^[A-Z][A-Z]?"
+
+cf_input <- mutate(cf_input, pc_area = str_extract(postcode, area_pattern))
+```
+
+Use the `tabyl()` function as above to compare `pc_area` with `city_code`
+```{r}
+tabyl(cf_input, city, pc_area)
+```
+This highlights an issue whereby some Glasgow postcodes are recorded as being in Renfrewshire and vice versa.
+
+This will need to be investigated and addressed as part of the cleaning activities.
+
+# Read in supporting datasets
+
+<div class="alert alter-block alert-success">
+
+There are a number of supporting datasets required for this analysis that can append additional information to the core CityFibre dataset.
+Most of these datasets come with supporting information, so it is recommended to review the online information and data dictionaries alongside reading in the files.
+
+These are:
+
+1. The superfast broadband scheme voucher scheme
+  + This provides postcode-level information about the voucher scheme available to help all properties to access superfast broadband
+  
+2. The Scottish Index of Multiple Deprivation 2020 indicators, indices and shapefiles
+  + This is a tool for understanding relative deprivation of areas across Scotland
+  + The file includes a relative level of deprivation for each datazone
+  + The file includes the raw data indicators used to calculated the create the overall level
+  + The file contains shapefiles the can be used to define the boundaries of the datazone on a map
+  
+3. Scottish postcode data, datazones and shapefiles
+  + All postcodes in Scotland are split into two files: small user and large user. The large user postcodes cover single addresses receiving >1000 items per day. These are mainly business addresses. The small user postcodes cover on average 15 addresses and the shapefiles highlight the boundaries of these postcodes.
+  + https://www.nrscotland.gov.uk/files//statistics/geography/2020-2/spd-datadictionary-2020-2.pdf
+  + https://www.nrscotland.gov.uk/files/geography/Products/postcode-bkgrd-info.pdf
+  + SIMD mapping between datazones and postcodes can also be extracted from these files
+  + Datazones are areas larger than postcodes that are used to aggregate the census information to neighbourhood statistics. Each postcode can be mapped to its surrounding datazone.
+  + https://www2.gov.scot/Topics/Statistics/sns/SNSRef/SNSPapDatZon
+
+</div>
+
+## Scottish Broadband Voucher Scheme
+
+<div class="alert alter-block alert-info">
+
+https://www.scotlandsuperfast.com/
+
+https://www.scotlandsuperfast.com/how-can-i-get-it/voucher-scheme/
+
+Scotland has a commitment to ensure every address in Scotland has access to a superfast broadband connection by the end of 2021. There is currently a voucher scheme in place for addresses where the current connection speed is less than 30Mbps. There are two types of voucher, £5000 for the main voucher scheme (MVS) and £400 for an interim scheme to help properties where the main rollout is in plan, but not until after 2021.
+
+The `scheme_references.csv' has data provided by CityFibre at postcode level about the possible level of voucher available.
+
+</div>
+
+Read in the `scheme_references.csv' dataset and clean up names on input.
+Call the dataset `sbvs_input`
+```{r}
+sbvs_input <- read_csv(file.path(input_file_path, "scheme_references.csv")) %>%
+  clean_names()
+```
+
+
+## SIMD 2020
+
+<div class="alert alter-block alert-info">
+
+https://www.gov.scot/publications/scottish-index-multiple-deprivation-2020
+
+All the required files can be found in the `SG_SIMD_2020` folder.
+
+The dataset has an identifier called `data_zone` which is larger than a postcode. More information on Data Zones can be found [here](https://www.isdscotland.org/Products-and-Services/GPD-Support/Geography/). Each Data Zone contains around 500-1000 people and are the smallest level for summarising the census information.
+
+</div>
+
+Before starting it is necessary to access the SIMD data which can be found here:
+http://sedsh127.sedsh.gov.uk/Atom_data/ScotGov/ZippedShapefiles/SG_SIMD_2020.zip
+
+Put this folder into the data folder.
+
+Read in the  ".shp" dataset from the `SG_SIMD_2020` folder folder using the `st_read()` function from the `sf` package.
+```{r}
+simd_input <- st_read(file.path(input_file_path, "SG_SIMD_2020/SG_SIMD_2020.shp")) %>%
+  clean_names()
+```
+The output is a special type of data frame with the boundary geometry data attached.
+
+## Scottish postcode data
+
+<div class="alert alter-block alert-info">
+
+https://www.nrscotland.gov.uk/statistics-and-data/geography/our-products/scottish-postcode-directory/2020-2
+
+Background information on postcodes can be found [here](https://www.nrscotland.gov.uk/files/geography/Products/postcode-bkgrd-info.pdf)
+Postcodes are split into two types: small and large. 
+
+Small user postcodes are based on one or more addresses. There are on average 15 delivery points in a single postcode with a boundary polygon around each postcode. The polygons cover the whole of Scotland's land surface.
+
+Large user postcodes are allocated to single addresses that receive in excess of 1000 items of mail per day. There are no boundaries, but each large user is linked to its nearest small user postcode.
+
+</div>
+
+Before starting it is necessary to access the postcode information.
+This can be the latest version if preferred.
+
+Download the postcode unit boundaries, unzip and save the whole directory into the data directory.
+https://www.nrscotland.gov.uk/files//statistics/geography/2020-2/PC_Cut_20_2.zip
+
+Download the postcode indexes and save the small and large user files into the same directory
+https://www.nrscotland.gov.uk/files//statistics/geography/2020-2/SPD_PostcodeIndex_Cut_20_2_CSV.zip
+
+Using `read_csv()` read in the `SmallUser.csv` file, cleaning names on input. Call this `pc_small_input`
+```{r}
+pc_small_input <- read_csv(file.path(input_file_path, "PC_Cut_20_2/SmallUser.csv")) %>%
+  clean_names()
+```
+Read in the `LargeUser.csv` file cleaning names on input. Call this `pc_large_input`.
+```{r}
+pc_large_input <- read_csv(file.path(input_file_path, "PC_Cut_20_2/LargeUser.csv")) %>%
+  clean_names()
+```
+All the supporting datasets have now being read in.
+
+# Understanding supporting datasets
+It is now necessary to understand the supporting datasets in more detail using a similar approach to the CityFibre dataset.
+
+<div class="alert alter-block alert-info">
+
+The steps required for each dataset are:
+
+* Visual inspection
+* Size, shape and format
+* Missing values
+* Unique values
+* Relationships between columns
+
+</div>
+
+## Scottish Broadband Voucher Scheme
+
+### Visual inspection
+Use `head()` to have a quick look at the dataset to see what it contains.
+```{r}
+head(sbvs_input)
+```
+The file contains two columns. One with postcode and one containing the scheme reference.
+
+### Size, shape and format
+Use `glimpse()` and `summary()` to identify the number of rows, columns and the format of each
+```{r}
+glimpse(sbvs_input)
+```
+```{r}
+summary(sbvs_input)
+```
+From this it can be seen that the file has 26,420 rows and 2 columns.
+Both columns contain characters.
+
+### Missing values
+Are there any missing values?
+```{r}
+sum(is.na(sbvs_input$postcode))
+sum(is.na(sbvs_input$scheme_references))
+```
+No missing values
+
+### Unique values
+How many of the values are unique?
+```{r}
+n_distinct(sbvs_input$postcode)
+n_distinct(sbvs_input$scheme_references)
+```
+From this it can be seen that there are 26420 different postcodes and 2 different values of scheme_references
+
+Use `tabyl()` to summarise the occurence of each different value of `scheme_references`
+```{r}
+tabyl(sbvs_input, scheme_references)
+```
+
+
+There are two values "IVS" and "MVS" which correspond to the interim and main voucher schemes respectively.
+
+## SIMD 2020
+
+### Visual inspection
+Use `head()` to have a quick look at the dataset to see what it contains.
+```{r}
+head(simd_input)
+```
+The SIMD file contains a lot of columns including some geometry information.
+
+### Size, shape and format
+Use `glimpse()` and `summary()` to identify the number of rows, columns and the format of each
+```{r}
+glimpse(simd_input)
+```
+```{r}
+summary(simd_input)
+```
+So the file contains 6976 rows and 52 columns.
+
+The columns are a mixture of character and numeric data.
+
+On visual inspection it is easy to see that some of the columns that are marked as character data are really numeric, but have "%" attached. These will need to be cleaned up if these columns are required to be kept.
+
+### Missing values
+Look at the missing values for the key field which is `data_zone`.
+```{r}
+sum(is.na(simd_input$data_zone))
+```
+No missing values for `data_zone`.
+
+### Unique values
+Look at the unique values for the `data_zone` field.
+```{r}
+n_distinct(simd_input$data_zone)
+```
+The file has 6976 rows and there are 6976 distinct rows.
+All rows are unique.
+
+## Scottish postcode data
+
+### Visual inspection
+Use `head()` to have a quick look at both the small and large postcode files to see what they contain.
+```{r}
+head(pc_small_input)
+```
+```{r}
+head(pc_large_input)
+```
+Each file contains similar information, but there are differences between the two in terms of the columns and level of information.
+`pc_small_user` also contains some census information.
+
+### Size, shape and format
+Use `glimpse()` and `summary()` to identify the number of rows, columns and the format of each postcode file.
+```{r}
+glimpse(pc_small_input)
+
+summary(pc_small_input)
+```
+Rows: 191,504
+Columns: 57
+
+```{r}
+glimpse(pc_large_input)
+
+summary(pc_large_input)
+```
+Rows: 48,842
+Columns: 51
+
+<div class="alert alter-block alert-info">
+
+The small and large postcode files have different number of columns and therefore contain slightly different information.
+
+It would be useful understand which columns occur in both datasets and which do not.
+
+The `names()` function can be used to extract the column names into a separate vector for comparison.
+
+Set operation functions `intersect()` and `setdiff()` can then be used to compare the two resulting vectors.
+
+`setdiff(A, B)` is not the same as `setdiff(B, A)`
+
+</div>
+
+Use the `names()` function to extract two vectors of column names for the two postcode files
+```{r}
+small_names <- names(pc_small_input)
+large_names <- names(pc_large_input)
+```
+
+Use the `intersect()` function to look at the columns in common between the two datasets
+```{r}
+intersect(small_names, large_names)
+```
+There are 50 columns in both datasets.
+Only need a selection of the columns will be required for the analysis.
+
+Use the `setdiff()` function twice to look at the columns that are not in common between the two vectors.
+```{r}
+setdiff(small_names, large_names)
+setdiff(large_names, small_names)
+```
+The small user file contains census information.
+The large user file contains a reference to its linked small user postcode.
+
+### Missing values
+
+Look at missing values for both fileds for the key field which is `postcode`
+```{r}
+sum(is.na(pc_small_input$postcode))
+```
+
+```{r}
+sum(is.na(pc_large_input$postcode))
+```
+No missing values
+
+### Unique values
+Look at distinct values of `postcode` for both files
+```{r}
+n_distinct(pc_small_input$postcode)
+```
+184824 unique values in a file of 191504 rows.
+```{r}
+n_distinct(pc_large_input$postcode)
+```
+43907 unique values in a file of 48842. This highlights that some postcodes are duplicated in the file.
+Further investigation will be required to understand what is causing the duplication.
+
+The files will also need to be merged together to create a definitive list of valid postcodes.

@@ -1,0 +1,493 @@
+---
+title: "CityFibre - 3. Data Analysis"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 3 - CityFibre data analysis**
+
+This notebook steps through the fifth step of the CityFibre data analysis problem: undertaking the actual analysis
+
+The analysis datasets have been prepared. These are:
+
+* cf_pc_analysis: the CityFibre postcodes at postcode level with supporting postcode level fields
+* cf_dz_analysis: the datazones containing CityFibre postcodes at datazone level and supporting SIMD data
+
+The next step is to undertake the actual data analysis.
+
+At this point it is useful to revisit the problem statement:
+**Which residents potentially require access to lower cost broadband in our Scottish Cities?**
+
+Areas can be prioritised in different ways:
+
+* Those with low SIMD ranks - this is at datazone level
+* Those with currently low rates of access to superfast broadband - this is at datazone level
+* Those with voucher schemes that will finance the supply of superfast broadband - this is at postcode level
+* Those in rural locations for which it may be more difficult to supply broadband - this is at postcode level
+
+In reality it is a combination of these factors that will identify the areas to focus on.
+
+The approach taken is to:
+
+* Identify the factors to focus on 
+* Create a score which identifies the the prioritisation of postcodes
+* Identify a score cut-off for the highest priority postcodes
+* Experiment with alternative scoring approaches
+
+</div>
+
+# Investigate correlations
+
+<div class="alert alter-block alert-info">
+
+To understand which variables should be included in the score, it is first necessary to understand the relationships between the analysis variables. This gives a feel for which variables are important to the prioritisation.
+
+For numeric variables it is possible calculate correlations between them.
+
+</div>
+
+## Income support rate and employment support rate
+
+<div class="alert alter-block alert-info">
+
+The first two variables to compare are `income_support_rate` and `employment_support_rate`.
+
+There is an expectation that these variables are related.
+
+Using ggplot2, a scatterplot can be created with using the `geom_point()` geom.
+A line of best fit can be added with `geom_smooth()`.
+The background theme can be altered to change how the non-data elements of the plot are displayed.
+
+</div>
+
+Using the `ggplot()` system and the `geom_point()` geom, plot the relationship between the `income_support_rate` on the x-axis and the `employment_support_rate` on the y=axis from the datazone level analysis file.
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = employment_support_rate)) +
+  geom_point()
+```
+
+Plot this relationship again, but this time overlay an orange line of best fit over the top, add a main title, axes titles and use a clear backgrounds, axes and points size to emphasise the most important information.
+
+The choice of possible inbuild themes can be found [here](https://ggplot2.tidyverse.org/reference/index.html#section-themes).
+
+The list of predefined colours can be found [here](http://sape.inf.usi.ch/quick-reference/ggplot2/colour).
+
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = employment_support_rate)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm", se = FALSE, color = "orange") +
+  labs(title = "Relationship between Income Support and Employment Support") +
+  xlab("Income Support Rate") +
+  ylab("Employment Support Rate") +
+  theme_classic()
+```
+The two variables appear to be related.
+
+Calculate the Pearson correlation coefficient using `cor.test()`
+```{r}
+inc_emp_corr <- cor.test(cf_dz_analysis$income_support_rate, cf_dz_analysis$employment_support_rate,
+                        method = "pearson")
+inc_emp_corr
+```
+
+A correlation coefficient of ~97% tells us that these two values are highly correlated.
+
+Both variables will not be required for any future analysis, as they contain almost the same information.
+
+## Income support rate and SIMD rank
+
+Using the `ggplot()` system and the `geom_point()` geom, plot the relationship between the `income_support_rate` and the `employment_support_rate` from the datazone level analysis file.
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = simd_rank)) +
+  geom_point()
+```
+The relationship in this case is not a straight line (linear) and is in the negative rather than positive direction.
+
+Plot this relationship again, but focus on tidying up the graph for clarity.
+As the points overplot each other it may be necessary to increase their transparency to view them.
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = simd_rank)) +
+  geom_point(size = 0.5, alpha = 0.3) +
+  labs(title = "Relationship between Income Support Rate\nand the Scottish Index of Multiple Deprivation Rank") +
+  xlab("Income Support Rate") +
+  ylab("SIMD Rank") +
+  theme_classic()
+```
+
+
+Calculate Pearson's correlation coefficient between the `income_support_rate` and `simd_rank`
+```{r}
+cor.test(cf_dz_analysis$income_support_rate, cf_dz_analysis$simd_rank,
+                        method = "pearson")
+```
+With a correlation coefficient of -92%, it impliest that the variables are quite highly correlated, but in the negative direction.
+
+This is not unexpected since the income variable is a strong component of the SIMD.
+
+Similar information is contained within the `SIMD rank`, `income_support_rate` and `employment_support_rate`. All three will not be required for further analysis.
+
+## Income support rate and broadband access rate
+
+Plot the relationship between income_support_rate and nobroadband_rate
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = nobroadband_rate)) +
+  geom_point()
+```
+There is no obvious strong relationship, but there are more points at the lower end of the graph.
+
+Plot this relationship again, but focus on tidying up the graph for clarity.
+Again it may be necessary to deal with the over-plotting.
+```{r}
+ggplot(cf_dz_analysis, aes(x = income_support_rate, y = nobroadband_rate)) +
+  geom_point(size = 0.5, alpha = 0.3) +
+  labs(title = "Relationship between Income Support Rate and\nlack of access to high speed broadband") +
+  xlab("Income Support Rate") +
+  ylab("No Broadband Rate") +
+  theme_classic()
+```
+
+Calculate Pearson's correlation coefficient between the `income_support_rate` and `nobroadband_rate`.
+```{r}
+cor.test(cf_dz_analysis$income_support_rate, cf_dz_analysis$nobroadband_rate,
+                        method = "pearson")
+```
+
+These variables are slightly negatively correlated
+
+Both variables will contain information that will be useful in the analysis
+
+## Scheme reference
+
+<div class="alert alter-block alert-info">
+
+Both `scheme_reference` and `ur_class` variables are categorical so it is not possible to carry out a correlation analysis.
+In this case it is possible to compare the average `nobroadband_rate` in each of the classes and plot this to understand how they are related to each other.
+
+</div>
+
+First calculate at the relative frequencies of data in each category at postcode level.
+
+Using  `geom_bar()`, plot the count of `scheme_references`
+```{r}
+ggplot(cf_pc_analysis, aes(x = scheme_references)) +
+  geom_bar()
+```
+From this it can clearly be seen that most postcodes do not have a `scheme_reference` attached.
+
+If this information is tabulated it is clear to see the difference in counts.
+
+Tabulate this information using `tabyl()`
+```{r}
+tabyl(cf_pc_analysis$scheme_references)
+```
+
+Replot with a more informative bar graph.
+Replace the "NA" values with "None" to make it clearer what they are representing
+Colour the bars. The list of predefined colours can be found [here](http://sape.inf.usi.ch/quick-reference/ggplot2/colour)
+
+Update the scheme_references using `replace_na()`, replace all missing values with the string "None".
+```{r}
+cf_pc_analysis <- mutate(cf_pc_analysis, scheme_references = replace_na(scheme_references, "None"))
+```
+
+Replot the bar chart to make it more informative and clearer.
+```{r}
+ggplot(cf_pc_analysis, aes(x = scheme_references)) +
+  geom_bar(fill = "orchid4") +
+  labs(title = "Distribution of SBVS Schemes by postcode") +
+  xlab("Scheme Reference") +
+  theme_classic()
+```
+This shows that most postcodes are not included in the SBVS schemes.
+
+Now to review the average rate of access to broadband by `scheme_reference`.
+
+Using `stat_summary()` with the function of "mean" and a geom of "bar"
+```{r}
+ggplot(cf_pc_analysis, aes(x = scheme_references, y = nobroadband_rate)) +
+  stat_summary(fun = "mean", geom = "bar")
+```
+Replot the bar chart to make it more informative and clearer.
+```{r}
+ggplot(cf_pc_analysis, aes(x = scheme_references, y = nobroadband_rate)) +
+  stat_summary(fun = "mean", geom = "bar", fill = "orchid4") +
+  labs(title = "Rate of lack of broadband access by SBVS Scheme") +
+  xlab("Scheme Reference") +
+  ylab("No Broadband Rate") +
+  theme_classic()
+```
+
+
+This shows as expected that the rate of no access to broadband is significantly higher in both the IVS and MVS postcodes.
+
+## Urban-rural classification
+
+First calculate at the relative frequencies of data in each category at postcode level using a bar chart.
+```{r}
+ggplot(cf_pc_analysis, aes(x = ur_class)) +
+  geom_bar()
+```
+
+Tabulate this information using `tabyl()`
+```{r}
+tabyl(cf_pc_analysis$ur_class)
+```
+
+Now tidy up this graph so it is clearer and bring in the names of the classes onto the x-axis rather than just the code. Add titles and axis labels for clarity.
+```{r}
+ggplot(cf_pc_analysis, aes(x = ur_name)) +
+  geom_bar(fill = "orchid4") +
+  labs(title = "Distribution of Urban Rural Classification by postcode") +
+  xlab("Urban Rural 8-fold Classification") +
+  ylab("No Broadband Rate") +
+  theme_classic()
+```
+
+Most postcodes are in category 1. This is as expected as the CityFibre data mainly covers urban areas.
+More importantly, there are no properties in categories 4, 5, 7 or 8.
+
+Looking at the average rate of lack of access to broadband by classification using `stat_summary()`
+```{r}
+ggplot(cf_pc_analysis, aes(x = ur_class, y = nobroadband_rate)) +
+  stat_summary(fun = "mean", geom = "bar")
+```
+Now tidy up this graph so it is clearer
+```{r}
+ggplot(cf_pc_analysis, aes(x = ur_name, y = nobroadband_rate)) +
+  stat_summary(fun = "mean", geom = "bar", fill = "orchid4") +
+  labs(title = "Rate of lack of broadband access by urban rural classification") +
+  xlab("Urban Rural 8-fold Classification") +
+  ylab("No Broadband Rate") +
+  theme_classic()
+```
+
+It is clear that the rate of access to broadband is much lower in category 1 - Large Urban Areas.
+
+# Identify priority postcodes
+
+## Create a score
+
+<div class="alert alter-block alert-info">
+
+From the understanding of the variables carried out in the previous secction it can be seen that the postcodes most in need are those in the low SIMD bands, have schemes attached and are not in ur_class 1.
+
+To enable a prioritisation, it is possible to create a score for each individual postcode that takes into account these different factors.
+
+The different weightings applied to each variable can be changed dependent on identifying different priorities.
+
+An example score approach to creating a score is given below.
+
+For example, give:
+
+* SIMD score
++ 10 points for the lowest SIMD decile upto 1 point for the highest decile.
+
+* ur_class score
++ 10 points for ur_class = 6,
++ 5 points for ur_class = 2 and 3
++ 0 points for ur_class 1
+
+* scheme_reference score
++ 10 points for having a scheme_reference
++ 0 points for no scheme reference
+
+Adding up the points will give a total score for each postcode
+
+</div>
+
+Using `mutate()` create individual scores for each contributing factor of `simd10`, `ur_class` and `scheme_reference` and a `total_score` that sums all three.
+```{r}
+cf_pc_score <- cf_pc_analysis %>%
+  mutate(simd_score = 11 - simd10,
+         ur_score = case_when(
+           ur_class == 6 ~ 10,
+           ur_class %in% c(2, 3) ~ 5,
+           TRUE ~ 0
+         ),
+         scheme_score = case_when(
+           scheme_references %in% c("IVS", "MVS") ~ 10,
+           TRUE ~ 0
+         ),
+         total_score = ur_score + scheme_score + simd_score)
+```
+
+## Plot the score distribution
+
+<div class="alert alter-block alert-info">
+
+The priority postcodes are now those with the highest scores.
+
+Th next step is to decide on a score cut-off for the prioritisation.
+
+To do this it is necessary to order the postcodes by descending score and visualise this distribution to identify which score to use as a cut-off.
+
+</div>
+
+Plot the distribution of the `total_score` from highest to lowest
+
+Using `select()` extract the `postcode2` and `total_score`.
+Using `arrange()` sort the `total_score` in descending order from highest to lowest.
+
+It is now necessary to extract the row index to show how many postcodes are at each score for the distribution.
+Use `rowid_to_column()` to extract the row index.
+```{r}
+score_dist <- cf_pc_score %>%
+  select(postcode2, total_score) %>%
+  arrange(desc(total_score)) %>%
+  rowid_to_column(var = "row_num") 
+```
+
+Using `geom_line()` plot a line graph of `row_num` vs `total_score` for the score distribution.
+```{r}
+ggplot(score_dist, aes(x = row_num, y = total_score)) +
+  geom_line()
+```
+
+
+It can be seen that only roughly 5000 postcodes have a score above 10.
+It is now useful to focus on the highest scoring 5000 postcodes.
+
+## Identify a score cut-off
+
+Using `head()`, extract the top 5000 postcodes.
+```{r}
+score_dist_top <- head(score_dist, 5000)
+```
+
+Replot the distribution of the top scoring postcodes.
+Focus on making the graph clear and informative with titles and axis labels.
+```{r}
+ggplot(score_dist_top, aes(x = rowid, y = total_score)) +
+  geom_line() +
+  labs(title = "Ordered score distribution by postcode") +
+  xlab("Number of postcodes") +
+  ylab("Score") +
+  theme_classic()
+```
+Depending on how many postcodes are required to be prioritised this identifies the score cutoff to use.
+This graph identifies that a score of 15 will identify around 1500 postcodes in most need.
+
+## Output the priority postcodes
+
+Create a new dataset with the postcodes with scores of 15 and over.
+Using `filter()` select all postcodes with a total_score of 15 and over.
+Keep `postcode2` and `total_score`.
+```{r}
+cf_pc_focus <- filter(score_dist_top, total_score >= 15) %>%
+  select(postcode2, total_score)
+```
+
+Merge in supporting information from the analysis dataset using a `left_join()`
+This will be needed for the next step
+```{r}
+cf_pc_focus <- left_join(cf_pc_focus, cf_pc_analysis, by = "postcode2") %>%
+  select(city, postcode, latitude, longitude, total_score, scheme_references, nobroadband_rate, 
+         simd10, pc_type, ur_class, simd_rank, postcode2)
+```
+
+
+# Prioritise scoring differently
+
+<div class="alert alter-block alert-warning">
+
+Experiment with a different approach to creating a score and identify a different 1000 - 2000 postcodes to focus on.
+
+How much overlap is there between the first and second set?
+
+</div>
+
+<div class="alert alter-block alert-info">
+
+An possible alternative scoring approach could focus on the SIMD rank rather than decile. This would ensure that the highest areas of deprivation have the highest scores.
+Also, the actual broadband access rate could be used.
+
+The scores do not need to be out of 10.
+There are 6976 datazones, so each score could be out of 7000.
+
+For example:
+
+* SIMD rank
++ 7000 - simd_rank.
+
+* broadband score
++ nobroadband_rate * 70
+
+</div>
+
+Calculate the updated score
+```{r}
+cf_pc_score2 <- cf_pc_analysis %>%
+  mutate(simd_score = 7000 - simd_rank,
+         bb_score = nobroadband_rate * 70,
+         total_score = bb_score + simd_score)
+```
+
+Plot the distribution
+```{r}
+score_dist2 <- cf_pc_score2 %>%
+  select(postcode2, total_score) %>%
+  arrange(desc(total_score)) %>%
+  rowid_to_column() 
+```
+
+```{r}
+ggplot(score_dist2, aes(x = rowid, y = total_score)) +
+  geom_line()
+```
+This is a much smoother score distribution than the previous one.
+
+Focus on the top 5000 postcodes to decide the score cut-off.
+
+```{r}
+score_dist_top2 <- head(score_dist2, 5000)
+```
+
+Replot the top 5000 postcodes
+```{r}
+ggplot(score_dist_top2, aes(x = rowid, y = total_score)) +
+  geom_line() +
+  labs(title = "Ordered score distribution by postcode") +
+  xlab("Number of postcodes") +
+  ylab("Score") +
+  theme_classic()
+```
+
+A score cutoff of 7000 identifies those postcodes that are either high in SIMD rank or lack of broadband access.
+
+Select the priority postcodes
+```{r}
+cf_pc_focus2 <- filter(score_dist_top2, total_score >= 7000) %>%
+  select(postcode2, total_score)
+```
+
+Merge in supporting information from the analysis dataset using a `left_join()`
+This will be needed for the next step
+```{r}
+cf_pc_focus2 <- left_join(cf_pc_focus2, cf_pc_analysis, by = "postcode2") %>%
+  select(city, postcode, latitude, longitude, total_score, scheme_references, nobroadband_rate, 
+         simd10, pc_type, ur_class, simd_rank, postcode2)
+```
+
+How many postcodes are in both priority datasets?
+Use an `inner_join()` to find the overlap between the two
+```{r}
+cf_pc_common <- inner_join(cf_pc_focus, cf_pc_focus2, by = "postcode2")
+```
+
+235 postcodes in common between the two datasets.
+
+
+# Further analysis ideas
+
+Use the postcode level population information from the 2011 census to maximise the population impacted
+

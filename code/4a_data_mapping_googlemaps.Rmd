@@ -1,0 +1,64 @@
+---
+title: "CityFibre - 4a. Data Mapping - google maps"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 4a - CityFibre google mapping**
+
+This notebook steps through the sixth step of the CityFibre data analysis problem: using google maps to plot the location of the priority postcodes
+
+The steps involved cover:
+
+* Export a file with the required pin information
+* Import this into google maps
+* Select the marker fields
+
+</div>
+
+
+# Plot postcode pins on google maps
+
+Write out a file with pin information
+
+First need to set up a link to where the output files are stored
+```{r}
+output_file_path <- "/Users/jowatts/github/cityfibre-schools/outputs/"
+```
+
+```{r}
+gmaps <- cf_pc_focus %>%
+  select(city, postcode, latitude, longitude, total_score, scheme_references, nobroadband_rate, 
+         simd10, pc_type, ur_class)
+
+write_csv(gmaps, file.path(output_file_path, "cf_prioritised_pc.csv"))
+```
+
+Go to [https://www.google.com/mymaps](https://www.google.com/mymaps)
+
+Select "Create a new map"
+
+Give the map a suitable title
+
+Import the exported gmaps .csv file
+
+Select latitude and longitude as the position fields
+
+Select Postcode as the marker title
+
+All other data will be imported and will be visible on the marker.
+
+
+
+
+

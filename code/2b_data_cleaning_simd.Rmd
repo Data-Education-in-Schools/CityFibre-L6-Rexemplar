@@ -1,0 +1,150 @@
+---
+title: "CityFibre - 2c. Data Cleaning - SIMD dataset"
+output:
+  html_notebook:
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+<div class="alert alert-block alert-success">
+
+**Part 2b - SIMD dataset cleaning**
+
+This notebook steps through the third step of the CityFibre data analysis problem: cleaning the SIMD dataset.
+
+The SIMD dataset currently contains numeric values stored as percentages that need to have the "%" removed and converted to proper numeric values.
+
+The column names are also not intuitive, so may lead to confusion in future analysis. It is therefore necessary to rename them.
+
+The steps involved include: 
+
+* Selecting the required columns
+* Convert to numeric those columns that are in string format
+* Rename all columns to a descriptive variable name
+
+</div>
+
+# SIMD data cleaning
+
+## SIMD retain columns of interest
+
+Use the `names()` function to print out all the fields in the `simd_input` dataset:
+```{r}
+names(simd_input)
+```
+
+<div class="alert alter-block alert-info">
+
+The problem statement requires the analyst to focus on SIMD, income, employment and broadband access.
+The names of these fields in the dataset are:
+
+* rankv2 - SIMD rank
+* inc_rate
+* emp_rate
+* g_acc_brdbnd
+
+Other fields to retain for reference or further analysis are:
+
+* data_zone
+* dz_name
+* sape2017 - population
+* wape2017 - working age population
+
+Other fields may also be retained. The detail of each field can be found in the SIMD technical notes:
+
+[SIMD technical notes](https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/09/simd-2020-technical-notes/documents/simd-2020-technical-notes/simd-2020-technical-notes/govscot%3Adocument/SIMD%2B2020%2Btechnical%2Bnotes.pdf)
+
+</div>
+
+Use `select()` to select the required fields. 
+Use `st_drop_geometry() to convert the `sf` object into a data frame.
+Name the output dataset `simd_retain`.
+```{r}
+**outputdataset** <- **inputdataset** %>%
+  select(**list of vars separated by commas**) %>%
+  st_drop_geometry()
+
+#The final function will drop the geometry column that is not required
+```
+
+## Convert string columns to numerics
+
+Use `head()` to review the first few rows of the output dataset
+```{r}
+# Quick look at output dataset
+```
+Use `summary()` to review the format of the output dataset
+```{r}
+# Summary of output dataset
+```
+
+<div class="alert alter-block alert-warning">
+
+Which of the remaining variables should be numeric, but are currently stored as character values?
+
+</div>
+
+<div class="alert alter-block alert-info">
+
+To fix these columns is a two-step process:
+
+* remove the %'s 
+* convert the columns to numeric
+
+The `str_remove(varname, "%")` function can be used to remove the %s
+The `as.numeric(varname)` can then be used to change the variable type.
+
+</div>
+
+Use `str_remove()` and `as.numeric()` within a `mutate()` statement for each of the columns that require fixing. Write this out to a new cleaned dataset `simd_clean`
+```{r}
+**cleanoutput** <- mutate(**inputdataset**, 
+                     **var1** = as.numeric(str_remove(**var1**, "%")),
+                     **var2** = as.numeric(str_remove(**var2**, "%")),
+                     **var3** = as.numeric(str_remove(**var3**, "%")))
+```
+
+## Rename columns to be more descriptive
+
+Use `names()` to write out the column names on the cleaned dataset
+```{r}
+names(**cleanoutput**)
+```
+
+<div class="alert alter-block alert-info">
+
+The column names are not very intuitive.
+
+By referring to the Technical Notes it be seen that:
+
+* sape2017 is total population within the datazone
+* wape2017 is the working age population within the datazone
+* rankv2 is the rank across the whole of Scotland for that datazone. Low ranks are the most deprived, high ranks are the least deprived.
+* quintilev2 splits the ranks up into 5 groups containing 20% each. Quintile 1 is the most deprived. Quintile 5 is the least deprived.
+* decilev2 splits the ranks up into 5 groups containing 10% each. Similar to quintiles, 1 is the most deprived and 10 is the least deprived.
+* inc_rate is the percentage of adults in the datazone receiving income support.
+* emp_rate is the percentage of adults in the datazone receiving employment support
+* g_acc_brdbnd is the percentage of premises that **do not** have access to superfast broadband of 30Mb/s
+
+</div>
+
+For all the columns, use `rename()` to give them a variables a name that is more descriptive.
+Remember to continue to use lowercase letters and put '_' between words.
+```{r}
+**cleanoutput** <- **cleanoutput** %>%
+  rename(**newname1** = **oldname1**,
+         **newname2 = **oldname2**,
+         #continue to rename all the columns)
+```
+
+Use `head()` to review the first few rows of the output file
+```{r}
+# quick look at the cleaned output file
+```
+
