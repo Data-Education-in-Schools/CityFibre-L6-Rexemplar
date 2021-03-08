@@ -93,7 +93,7 @@ All the input datasets can now be imported directly from this directory.
 
 Assign the input_file_path to be the `data` directory
 ```{r}
-input_file_path <- "/mypathtodata/data/"
+input_file_path <- "/mypathtodata/data"
 ```
 
 # Read in CityFibre dataset
