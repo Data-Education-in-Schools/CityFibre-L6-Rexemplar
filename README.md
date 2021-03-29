@@ -7,7 +7,7 @@ All the required input data can be found in the **data/** directory.
 
 Lessons using skeletal R-code, utilising the Tidyverse and ggplot can be found in the **code/** directory
 
-Worked answers and example output can be found in teh **worked_answers/** directory.
+Worked answers and example output can be found in the **worked_answers/** directory.
 
 This exemplar has been developed by Jo Watts (jo@effini.com) and supported by the Data Education in Schools team at Edinburgh University.
 
