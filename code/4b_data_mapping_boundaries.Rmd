@@ -187,3 +187,13 @@ saveWidget(map, file = file.path(output_file_path, "cf_prioritypc.html"))
 ```
 
 This `.html` file can now be viewed in a web browser and the locations of the prioritised postcodes and their information viewed on a map.
+
+# Extension - Map experimentation
+
+Experiment with changing the information that is displayed in the tool tips.
+
+Reformat the popup labels.
+
+Change the colours that are used for background and highlight on the leaflet map.
+
+Change the dataset for the differently prioritised scoring dataset.

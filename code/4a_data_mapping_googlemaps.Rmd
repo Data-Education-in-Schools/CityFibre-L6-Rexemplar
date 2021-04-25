@@ -44,17 +44,17 @@ gmaps <- cf_pc_focus %>%
 write_csv(gmaps, file.path(output_file_path, "cf_prioritised_pc.csv"))
 ```
 
-Go to [https://www.google.com/mymaps](https://www.google.com/mymaps)
+1. Go to [https://www.google.com/mymaps](https://www.google.com/mymaps)
 
-Select "Create a new map"
+2. Select "Create a new map"
 
-Give the map a suitable title
+3. Give the map a suitable title
 
-Import the exported gmaps .csv file
+4. Import the exported gmaps .csv file
 
-Select latitude and longitude as the position fields
+5. Select latitude and longitude as the position fields
 
-Select Postcode as the marker title
+6. Select Postcode as the marker title
 
 All other data will be imported and will be visible on the marker.
 

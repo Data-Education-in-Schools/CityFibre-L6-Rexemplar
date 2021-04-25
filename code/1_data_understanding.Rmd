@@ -26,7 +26,7 @@ This involves:
 * Identify any obvious data quality problems that might need to be addressed.
 * Finally, gain an insight into how the columns are related to each other.
 
-Where the code contains **s around the text, that is where students will need to change the text to put in their own values to make it work. eg "\*\*inputdataset\*\*" would need to be exchanged for a dataset name.
+Where the code contains **s around the text, that is where learners will need to change the text to put in their own values to make it work. eg "\*\*inputdataset\*\*" would need to be exchanged for a dataset name.
 
 </div>
 
@@ -36,7 +36,7 @@ Where the code contains **s around the text, that is where students will need to
 
 R packages are a collection of functions developed by the open source community. They make it quicker to undertake analysis by providing additional functionality for common activities on top of base R's functionality.
 
-There are thousands of packages available to choose from on [CRAN](https://cran.r-project.org/) - The Comprehensive R Achive Network).
+There are thousands of packages available to choose from on [CRAN](https://cran.r-project.org/) - The Comprehensive R Archive Network).
 
 Packages can be downloaded from CRAN using the command `install.packages("package-name").
 
@@ -209,7 +209,7 @@ sum(is.na(cf_input$**var2**))
 #Do this for all variables
 ```
 
-<div class="alert alter-block alert-info">
+<div class="alert alter-block alert-warning">
 
 Do any of the columns contain missing values?
 
@@ -226,7 +226,7 @@ n_distinct(cf_input$**var2**)
 #Do this for all variables
 ```
 
-<div class="alert alter-block alert-info">
+<div class="alert alter-block alert-warning">
 
 How many different cities are represented in the data?
 
@@ -240,7 +240,7 @@ What does the difference between the number of postcodes and the size of the dat
 
 <div class="alert alter-block alert-warning">
 
-What are the distinct values for `city` and `city_code`? 
+What are the 7 distinct values for `city` and `city_code`? 
 
 Is there a mapping or relationship between them?
 
@@ -356,7 +356,7 @@ The dataset has an identifier called `data_zone` which is larger than a postcode
 Before starting it is necessary to access the SIMD data which can be found here:
 http://sedsh127.sedsh.gov.uk/Atom_data/ScotGov/ZippedShapefiles/SG_SIMD_2020.zip
 
-Put this folder into the data folder.
+Put this folder into the `data` folder.
 
 Read in the  ".shp" dataset from the `SG_SIMD_2020` folder folder using the `st_read()` function from the `sf` package.
 ```{r}
@@ -383,7 +383,7 @@ Large user postcodes are allocated to single addresses that receive in excess of
 Before starting it is necessary to access the postcode information.
 This can be the latest version if preferred.
 
-Download the postcode unit boundaries, unzip and save the whole directory into the data directory.
+Download the postcode unit boundaries, unzip and save the whole directory into the `data` directory.
 https://www.nrscotland.gov.uk/files//statistics/geography/2020-2/PC_Cut_20_2.zip
 
 Download the postcode indexes and save the small and large user files into the same directory

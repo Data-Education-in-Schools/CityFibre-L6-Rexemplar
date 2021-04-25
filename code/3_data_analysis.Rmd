@@ -418,7 +418,7 @@ It is now useful to focus on the highest scoring 5000 postcodes.
 
 Using `head()`, extract the top 5000 postcodes.
 ```{r}
-**outputdataset** <- head(**inputdataset**, 5000)
+**outputdataset** <- head(**inputdataset**, **number**)
 ```
 
 Replot the distribution of the top scoring postcodes.
